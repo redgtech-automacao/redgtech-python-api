@@ -2,7 +2,7 @@ import aiohttp
 import logging
 
 _LOGGER = logging.getLogger(__name__)
-#parametrizar a url
+
 API_URL = "https://redgtech.com"
 
 class RedgtechAuthError(Exception):
