@@ -11,29 +11,69 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.x
+          python-version: '3.x'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install setuptools wheel twine build
 
-      - name: Clean dist and build folders
-        run: rm -rf dist/ build/ *.egg-info
+      - name: Debug - Show environment and files
+        run: |
+          echo "GitHub REF: $GITHUB_REF"
+          echo "Working directory contents:"
+          ls -la
+          echo "Setup.py content (version line):"
+          grep -n "version" setup.py || echo "No version line found"
+
+      - name: Force clean all build artifacts
+        run: |
+          rm -rf dist/ build/ *.egg-info
+          find . -name "*.pyc" -delete
+          find . -name "__pycache__" -delete
+          echo "Cleaned all build artifacts"
+
+      - name: Verify version before build
+        run: |
+          echo "Version from setup.py:"
+          python setup.py --version
 
       - name: Build package
-        run: python3 -m build
+        run: |
+          python3 -m build
+          echo "Package built successfully"
 
-      - name: List dist contents
-        run: ls -lh dist/
+      - name: List dist contents with details
+        run: |
+          echo "Contents of dist folder:"
+          ls -lh dist/
+          echo "Package files:"
+          find dist/ -name "*.whl" -o -name "*.tar.gz" | head -10
+
+      - name: Verify package contents
+        run: |
+          echo "Checking package with twine..."
+          twine check dist/*
+
+      - name: Debug - Show actual files being uploaded
+        run: |
+          echo "Files that will be uploaded:"
+          for file in dist/*; do
+            echo "File: $file"
+            echo "Size: $(stat -c%s "$file") bytes"
+          done
 
       - name: Publish package
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: twine upload dist/*
+        run: |
+          echo "Publishing to PyPI..."
+          twine upload dist/* --verbose
