@@ -21,18 +21,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel twine
+          pip install setuptools wheel twine build
 
       - name: Clean dist and build folders
         run: rm -rf dist/ build/ *.egg-info
 
       - name: Build package
-        run: |
-          python setup.py sdist bdist_wheel
+        run: python3 -m build
+
+      - name: List dist contents
+        run: ls -lh dist/
 
       - name: Publish package
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          twine upload dist/redgtech_api-*.whl dist/redgtech_api-*.tar.gz
+        run: twine upload dist/*
