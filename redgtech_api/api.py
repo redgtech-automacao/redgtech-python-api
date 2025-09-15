@@ -1,4 +1,6 @@
 import aiohttp
+
+from typing import Any
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,38 +18,50 @@ class RedgtechConnectionError(Exception):
 class RedgtechAPI:
     def __init__(self, token=None):
         self._token = token
+        self._session = None
+
+    async def _get_session(self):
+        """Get or create aiohttp session."""
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self):
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     async def login(self, email: str, password: str) -> str:
         """Authenticate with the Redgtech API and retrieve an access token."""
-        async with aiohttp.ClientSession() as session:
-            url = f"{API_URL}/home_assistant/login"
-            try:
-                async with session.post(url, json={'email': email, 'password': password}) as response:
-                    if response.status == 401:
-                        raise RedgtechAuthError("Invalid email or password")
-                    response.raise_for_status()
-                    data = await response.json()
-                    self._token = data.get('data', {}).get('access_token')
-                    if not self._token:
-                        raise RedgtechAuthError("No access token received from API")
-                    return self._token
-            except aiohttp.ClientError as e:
-                _LOGGER.error("Connection error during login: %s", e)
-                raise RedgtechConnectionError("Failed to connect to Redgtech API") from e
-            except Exception as e:
-                _LOGGER.error("Unexpected error during login: %s", e)
-                raise RedgtechConnectionError("Unexpected error during login") from e
+        session = await self._get_session()
+        url = f"{API_URL}/home_assistant/login"
+        try:
+            async with session.post(url, json={'email': email, 'password': password}) as response:
+                if response.status == 401:
+                    raise RedgtechAuthError("Invalid email or password")
+                response.raise_for_status()
+                data = await response.json()
+                self._token = data.get('data', {}).get('access_token')
+                if not self._token:
+                    raise RedgtechAuthError("No access token received from API")
+                return self._token
+        except aiohttp.ClientError as e:
+            _LOGGER.error("Connection error during login: %s", e)
+            raise RedgtechConnectionError("Failed to connect to Redgtech API") from e
+        except Exception as e:
+            _LOGGER.error("Unexpected error during login: %s", e)
+            raise RedgtechConnectionError("Unexpected error during login") from e
 
-    async def get_data(self, token: str = None) -> dict:
+    async def get_data(self, token: str = None) -> dict[str, Any]:
         """Fetch data from the Redgtech API."""
         token = token or self._token
         if not token:
             raise RedgtechAuthError("No access token available for fetching data")
         url = f"{API_URL}/home_assistant?access_token={token}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                return await response.json()
+        session = await self._get_session()
+        async with session.get(url) as response:
+            response.raise_for_status()
+            return await response.json()
 
     async def set_switch_state(self, endpoint_id: str, state: bool, token: str = None) -> bool:
         """Set the state of a switch."""
@@ -62,9 +76,10 @@ class RedgtechAPI:
             value = f"{number_channel}{state_char}" if type_channel == "AC" else f"{type_channel}{number_channel}*{state_char}*"
             url = f"{API_URL}/home_assistant/execute/{id_part}?cod=?{value}"
             headers = {"Authorization": f"{token}"}
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
-                    return response.status == 200
+            session = await self._get_session()
+            async with session.get(url, headers=headers) as response:
+                _LOGGER.info("Switch state request: %s -> %s (status: %s)", endpoint_id, state, response.status)
+                return response.status == 200
         except aiohttp.ClientError as e:
             _LOGGER.error("Connection error while setting switch state: %s", e)
             raise RedgtechConnectionError("Failed to connect to Redgtech API") from e
@@ -85,9 +100,9 @@ class RedgtechAPI:
             value = f"{type_channel}{number_channel}*{brightness_value}*"
             url = f"{API_URL}/home_assistant/execute/{id_part}?cod=?{value}"
             headers = {"Authorization": f"{token}"}
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
-                    return response.status == 200
+            session = await self._get_session()
+            async with session.get(url, headers=headers) as response:
+                return response.status == 200
         except aiohttp.ClientError as e:
             _LOGGER.error("Connection error while setting light brightness: %s", e)
             raise RedgtechConnectionError("Failed to connect to Redgtech API") from e
