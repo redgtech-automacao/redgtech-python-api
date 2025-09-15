@@ -36,7 +36,7 @@ class RedgtechAPI:
         session = await self._get_session()
         url = f"{API_URL}/home_assistant/login"
         try:
-            async with session.post(url, json={'email': email, 'password': password}) as response:
+            async with session.post(url, json={"email": email, "password": password}) as response:
                 if response.status == 401:
                     raise RedgtechAuthError("Invalid email or password")
                 response.raise_for_status()

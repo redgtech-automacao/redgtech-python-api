@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="redgtech-api",
-    version="0.1.36",
+    version="0.1.37",
     description="A Python package to interact with the Redgtech API",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
